@@ -1,9 +1,11 @@
+from time import sleep
 import os
 import json
-from typing import Union, Dict
+from typing import Union, Dict, Optional
 import requests
 from dotenv import load_dotenv
 load_dotenv()
+
 NOTION_ENDPOINT = "https://api.notion.com/v1/pages"
 NOTION_SECRET = os.getenv("NOTION_SECRET")
 TARGET_DB = os.getenv("TARGET_DB")
@@ -22,12 +24,14 @@ class NotionData:
     def add_property(self,
                      field_name: str,
                      value: Union[str, Dict[str, str]],
+                     link: Optional[str] = None,
                      property_type: str = 'title',
                      overwrite: bool = False):
         """
         Adds a new data property to the row
         :param str field_name: Field name in the table
         :param str value: Field value
+        :param str link:
         :param str property_type: Field type.
         For more: https://developers.notion.com/reference/database#database-properties
         :param bool overwrite: If True - overwrites value with the same name
@@ -36,12 +40,27 @@ class NotionData:
             raise ValueError(
                 f"A property named {field_name} already exists in this entry."
             )
+        if property_type == 'text':
+            property_type = 'rich_text'
+        if link and property_type != 'rich_text':
+            raise ValueError(
+                f"Link type is compactible only with the \"rich_text\" property_type"
+            )
+
         if property_type == 'title':
             self.data["properties"][field_name] = {property_type: [{"text": {"content": value}}]}
         elif property_type == 'url':
             self.data["properties"][field_name] = {property_type: value}
-        elif property_type == 'select':
-            self.data["properties"][field_name] = {property_type: value}
+        elif property_type == 'rich_text':
+            if link:
+                self.data["properties"][field_name] = {property_type: [{"text": {"content": value,
+                                                                                 "link": {"url": link}}}]}
+            else:
+                self.data["properties"][field_name] = {property_type: [{"text": {"content": value}}]}
+        # there is no way to add custom "select" or "multi-select" tag
+        # with current API V1 (confirmed by the Notion support service)
+        # elif property_type == 'select':
+        #     self.data["properties"][field_name] = {property_type: value}
 
     def publish_row(self, print_curl=False):
         r = requests.post(url=NOTION_ENDPOINT,
@@ -67,13 +86,13 @@ notion = NotionData(notion_secret=NOTION_SECRET,
                     target_db=TARGET_DB)
 notion.add_property(field_name='Title',
                     property_type='title',
-                    value='Video title')
+                    value='Yooo samiy klassniy title')
 notion.add_property(field_name='Link',
                     property_type='url',
-                    value='https://ya.ru')
+                    value='https://test.ru')
 notion.add_property(field_name='Playlist',
-                    property_type='select',
-                    value={"name": "non existing select"})
-notion.publish_row(print_curl=True)
+                    property_type='rich_text',
+                    value='Playlist Name',
+                    link='http://ya.ru')
+notion.publish_row(print_curl=False)
 
-print(42)
