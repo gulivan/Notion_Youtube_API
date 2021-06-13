@@ -1,4 +1,3 @@
-from time import sleep
 import os
 import json
 from typing import Union, Dict, Optional
@@ -14,6 +13,9 @@ TARGET_DB = os.getenv("TARGET_DB")
 class NotionData:
     data = {"properties": {}}
     headers = {"Content-Type": "application/json", "Notion-Version": "2021-05-13"}
+    property_types = ["title", "rich_text", "number", "select", "multi_select", "date", "people", "file", "checkbox",
+                      "url", "email", "phone_number", "formula", "relation", "rollup", "created_time", "created_by",
+                      "last_edited_time", "last_edited_by"]
 
     def __init__(self, notion_secret: str, target_db: str):
         self.target_db = target_db
@@ -57,6 +59,14 @@ class NotionData:
                                                                                  "link": {"url": link}}}]}
             else:
                 self.data["properties"][field_name] = {property_type: [{"text": {"content": value}}]}
+        elif property_type in self.property_types:
+            raise ValueError(
+                f"The property_type {property_type} is not supported yet"
+            )
+        else:
+            raise ValueError(
+                f"Invalid property_type: {property_type}"
+            )
         # there is no way to add custom "select" or "multi-select" tag
         # with current API V1 (confirmed by the Notion support service)
         # elif property_type == 'select':
@@ -95,4 +105,3 @@ notion.add_property(field_name='Playlist',
                     value='Playlist Name',
                     link='http://ya.ru')
 notion.publish_row(print_curl=False)
-
