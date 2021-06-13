@@ -72,7 +72,14 @@ class NotionData:
         # elif property_type == 'select':
         #     self.data["properties"][field_name] = {property_type: value}
 
-    def publish_row(self, print_curl=False):
+    def publish_row(self,
+                    print_curl: bool = False,
+                    clean_data: bool = False):
+        """
+        Publish a row with an object data to database.
+        :param print_curl: Prints CURL command for debug purposes
+        :param clean_data: Resets data to the initial state
+        """
         r = requests.post(url=NOTION_ENDPOINT,
                           data=json.dumps(self.data),
                           headers=self.headers)
@@ -89,6 +96,8 @@ class NotionData:
             raise ValueError(
                 f"Error code: {r.json()['code']}. Message: {r.json()['message']}"
             )
+        if clean_data:
+            self.data = {"properties": {}}
         return True
 
 
