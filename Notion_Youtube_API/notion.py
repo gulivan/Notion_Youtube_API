@@ -1,13 +1,15 @@
 import json
-from typing import Union, Dict, Optional
+from typing import Union, Dict, Optional, List, Any
 import requests
-NOTION_ENDPOINT = "https://api.notion.com/v1/pages"
+NOTION_ENDPOINT_PAGES = "https://api.notion.com/v1/pages/"
+NOTION_ENDPOINT_DATABASES = "https://api.notion.com/v1/databases/"
+NOTION_VERSION = "2021-05-13"
 
 
 class Notion:
     data = {"properties": {}}
     headers = {"Content-Type": "application/json",
-               "Notion-Version": "2021-05-13"}
+               "Notion-Version": NOTION_VERSION}
     property_types = ["title", "rich_text", "number", "select", "multi_select", "date", "people", "file", "checkbox",
                       "url", "email", "phone_number", "formula", "relation", "rollup", "created_time", "created_by",
                       "last_edited_time", "last_edited_by"]
@@ -75,7 +77,7 @@ class Notion:
         :param print_curl: Prints CURL command for debug purposes
         :param clean_data: Resets data to the initial state
         """
-        r = requests.post(url=NOTION_ENDPOINT,
+        r = requests.post(url=NOTION_ENDPOINT_PAGES,
                           data=json.dumps(self.data),
                           headers=self.headers)
         if print_curl:
@@ -92,5 +94,38 @@ class Notion:
                 f"Error code: {r.json()['code']}. Message: {r.json()['message']}"
             )
         if clean_data:
-            self.data = {"properties": {}}
+            self.data = {"properties": {}, "parent": {"database_id": self.target_db}}
         return True
+
+    def get_database(self,
+                     database_id: Optional[str] = None,
+                     start_cursor: Optional[str] = None):
+        def extract_values(results: List[Any]) -> List[List[str]]:
+            data_accumulator = []
+            for result in results:
+                try:
+                    playlist_url = result['properties']['Playlist']['rich_text'][0]['href']
+                    video_url = result['properties']['Link']['url']
+                except (KeyError, IndexError):
+                    playlist_url = ''
+                    video_url = ''
+                data_accumulator.append([playlist_url, video_url])
+            return data_accumulator
+
+        if not database_id:
+            database_id = self.target_db
+        target_url = f"{NOTION_ENDPOINT_DATABASES}{database_id}/query"
+        # data = {"start_cursor": )
+        if start_cursor:
+            data = {'start_cursor': start_cursor}
+            r = requests.post(target_url,
+                              headers=self.headers,
+                              data=json.dumps(data))
+        else:
+            r = requests.post(target_url,
+                              headers=self.headers)
+        result_data = extract_values(r.json()['results'])
+        if r.json().get('has_more'):
+            start_cursor = r.json().get('next_cursor')
+            result_data.extend(self.get_database(database_id, start_cursor=start_cursor))
+        return result_data
